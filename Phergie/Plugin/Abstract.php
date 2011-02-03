@@ -152,10 +152,21 @@ abstract class Phergie_Plugin_Abstract
             );
         }
         if (!is_null($name)) {
-            if (!isset($this->config[$name])) {
+        	if (FALSE === ($p = strpos($name, '.')))
+        	{
+        		// auto-add plugin name as prefix
+        		$name = strtolower($this->getName()) . '.' . $name;
+        	}
+        	else if ($p == 0)
+        	{
+        		// allows to get main setting: ask for '.setting' to get 'setting' w/out the plugin auto-added
+        		$name = substr($name, 1);
+        	}
+        	if (NULL === ($value = $this->config->getSetting($name, $this->getConnection())))
+			{
                 return $default;
             }
-            return $this->config[$name];
+            return $value;
         }
         return $this->config;
     }
