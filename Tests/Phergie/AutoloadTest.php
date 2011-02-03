@@ -22,6 +22,7 @@
 defined('PHERGIE_BASE_PATH') or define('PHERGIE_BASE_PATH', realpath(dirname(__FILE__) . '/../..'));
 
 require_once PHERGIE_BASE_PATH . '/Phergie/Autoload.php';
+require_once 'PHPUnit/Framework/Constraint/TraversableContains.php';
 
 /**
  * Unit test suite for Phergie_Autoload.

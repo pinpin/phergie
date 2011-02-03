@@ -126,64 +126,6 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
     }
 
     /**
-     * Tests the ability to change the handler's iterator class when a valid
-     * class is specified.
-     *
-     * @return void
-     */
-    public function testSetIteratorClassWithValidClass()
-    {
-        eval('
-            class DummyIterator extends FilterIterator {
-                public function accept() {
-                    return true;
-                }
-            }
-        ');
-
-        $this->handler->setIteratorClass('DummyIterator');
-
-        $this->assertType(
-            'DummyIterator',
-            $this->handler->getIterator()
-        );
-    }
-
-    /**
-     * Tests that a failure occurs when a nonexistent iterator class is
-     * specified.
-     *
-     * @return void
-     */
-    public function testSetIteratorClassWithNonexistentClass()
-    {
-        try {
-            $this->handler->setIteratorClass('FooIterator');
-            $this->fail('Expected exception was not thrown');
-        } catch (Phergie_Plugin_Exception $e) {
-            return;
-        }
-        $this->fail('Unexpected exception was thrown');
-    }
-
-    /**
-     * Tests that a failure occurs when a class that is not a subclass of
-     * FilterIterator is specified.
-     *
-     * @return void
-     */
-    public function testSetIteratorClassWithNonFilterIteratorClass()
-    {
-        try {
-            $this->handler->setIteratorClass('ArrayIterator');
-            $this->fail('Expected exception was not thrown');
-        } catch (Phergie_Plugin_Exception $e) {
-            return;
-        }
-        $this->fail('Unexpected exception was thrown');
-    }
-
-    /**
      * Tests countability of the plugin handler.
      *
      * @return void
@@ -197,7 +139,7 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
             'Handler does not implement Countable'
         );
 
-        $this->assertType(
+        $this->assertInternalType(
             'int',
             count($this->handler),
             'count() must return an integer'
@@ -838,6 +780,14 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
 
         $iterator2 = $this->handler->getIterator();
         $this->assertSame($plugin1, $iterator2->current());
+        $this->assertSame($plugin2, $iterator1->current());
+
+        $iterator3 = $this->handler->getIterator();
+        $this->assertSame($plugin1, $iterator3->current());
+
+        $iterator2->next();
+        $this->assertSame($plugin2, $iterator2->current());
+        $this->assertSame($plugin1, $iterator3->current());
     }
 
     /**
