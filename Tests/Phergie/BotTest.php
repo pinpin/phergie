@@ -373,12 +373,6 @@ class Phergie_BotTest extends Phergie_TestCase
             ->method('addPlugin')
             ->with($plugin);
 
-        $ui = $this->getMockUi();
-        $ui
-            ->expects($this->once())
-            ->method('onPluginLoad')
-            ->with($plugin);
-
         $this->bot->run();
     }
 
@@ -406,13 +400,85 @@ class Phergie_BotTest extends Phergie_TestCase
             ->expects($this->once())
             ->method('addPlugin')
             ->with($plugin)
-            ->will($this->throwException($exception));
+            ;
 
-        $ui = $this->getMockUi();
-        $ui
+        $this->bot->run();
+    }
+
+    /**
+     * Tests that plugins are read from the configuration in
+     * connection data (connection-specific plugins) and added
+     * to the plugin handler.
+     *
+     * @return void
+     */
+    public function testRunLoadsConnectionSpecificPlugin()
+    {
+        $plugin = 'MockWithoutDependencies';
+        $this->injectDependencies();
+        $this->setConfig('connections', array(array('host' => 'hostname', 'uniqid' => 42, 'plugins' => array($plugin))));
+
+		$driver = $this->getMockDriver();
+		$driver
+			->expects($this->once())
+			->method('setConnection')
+			->will($this->returnValue($driver))
+			;
+		$driver
+			->expects($this->once())
+			->method('doConnect')
+			;
+
+        $plugins = $this->getMockPluginHandler();
+        $plugins
             ->expects($this->once())
-            ->method('onPluginFailure')
-            ->with($plugin, $exception->getMessage());
+            ->method('setAutoload')
+            ->with($this->equalTo(FALSE))
+            ;
+        $plugins
+            ->expects($this->once())
+            ->method('addPlugin')
+            ->with($this->equalTo($plugin), $this->equalTo(NULL), $this->equalTo(42), $this->equalTo(FALSE))
+            ;
+
+        $this->bot->run();
+    }
+
+    /**
+     * Tests that extra plugins are read from the configuration in
+     * connection data (connection-specific plugins) and added
+     * to the plugin handler.
+     *
+     * @return void
+     */
+    public function testRunLoadsConnectionSpecificExtraPlugin()
+    {
+        $plugin = 'MockWithoutDependencies';
+        $this->injectDependencies();
+        $this->setConfig('connections', array(array('host' => 'hostname', 'uniqid' => 42, 'plugins_extra' => array($plugin))));
+
+		$driver = $this->getMockDriver();
+		$driver
+			->expects($this->once())
+			->method('setConnection')
+			->will($this->returnValue($driver))
+			;
+		$driver
+			->expects($this->once())
+			->method('doConnect')
+			;
+
+        $plugins = $this->getMockPluginHandler();
+        $plugins
+            ->expects($this->once())
+            ->method('setAutoload')
+            ->with($this->equalTo(FALSE))
+            ;
+        $plugins
+            ->expects($this->once())
+            ->method('addPlugin')
+            ->with($this->equalTo($plugin), $this->equalTo(NULL), $this->equalTo(42), $this->equalTo(TRUE))
+            ;
 
         $this->bot->run();
     }
@@ -460,12 +526,19 @@ class Phergie_BotTest extends Phergie_TestCase
         $plugins = $this->getMockPluginHandler();
         $plugins
             ->expects($this->at(0))
-            ->method('__call')
-            ->with($this->equalTo('setConnection'), $this->isType('array'));
+            ->method('setAutoload')
+            ->with($this->equalTo(FALSE))
+            ;
         $plugins
             ->expects($this->at(1))
             ->method('__call')
-            ->with('onConnect');
+            ->with('setConnection', $this->isType('array'))
+            ;
+        $plugins
+            ->expects($this->at(2))
+            ->method('__call')
+            ->with('onConnect')
+            ;
 
         $this->bot->run();
     }

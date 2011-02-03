@@ -53,6 +53,14 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
     protected $events;
 
     /**
+     * Mock Phergie_Ui_Abstract instance passed to the plugin handler
+     * constructor
+     *
+     * @var Phergie_Ui_Abstract
+     */
+    protected $ui;
+
+    /**
      * Returns a mock plugin instance.
      *
      * @param string $name    Optional short name for the mock plugin, defaults
@@ -85,9 +93,13 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
         $this->events = $this->getMock(
             'Phergie_Event_Handler', array('getIterator')
         );
+        $this->ui = $this->getMock(
+            'Phergie_Ui_Abstract'
+        );
         $this->handler = new Phergie_Plugin_Handler(
             $this->config,
-            $this->events
+            $this->events,
+            $this->ui
         );
     }
 
@@ -105,7 +117,7 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
             'Handler does not implement IteratorAggregate'
         );
 
-        $this->assertType(
+        $this->assertInstanceOf(
             'Iterator',
             $this->handler->getIterator(),
             'getIterator() must return an iterator'
@@ -119,68 +131,10 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
      */
     public function testGetIteratorReturnsDefault()
     {
-        $this->assertType(
+        $this->assertInstanceOf(
             'Phergie_Plugin_Iterator',
             $this->handler->getIterator()
         );
-    }
-
-    /**
-     * Tests the ability to change the handler's iterator class when a valid
-     * class is specified.
-     *
-     * @return void
-     */
-    public function testSetIteratorClassWithValidClass()
-    {
-        eval('
-            class DummyIterator extends FilterIterator {
-                public function accept() {
-                    return true;
-                }
-            }
-        ');
-
-        $this->handler->setIteratorClass('DummyIterator');
-
-        $this->assertType(
-            'DummyIterator',
-            $this->handler->getIterator()
-        );
-    }
-
-    /**
-     * Tests that a failure occurs when a nonexistent iterator class is
-     * specified.
-     *
-     * @return void
-     */
-    public function testSetIteratorClassWithNonexistentClass()
-    {
-        try {
-            $this->handler->setIteratorClass('FooIterator');
-            $this->fail('Expected exception was not thrown');
-        } catch (Phergie_Plugin_Exception $e) {
-            return;
-        }
-        $this->fail('Unexpected exception was thrown');
-    }
-
-    /**
-     * Tests that a failure occurs when a class that is not a subclass of
-     * FilterIterator is specified.
-     *
-     * @return void
-     */
-    public function testSetIteratorClassWithNonFilterIteratorClass()
-    {
-        try {
-            $this->handler->setIteratorClass('ArrayIterator');
-            $this->fail('Expected exception was not thrown');
-        } catch (Phergie_Plugin_Exception $e) {
-            return;
-        }
-        $this->fail('Unexpected exception was thrown');
     }
 
     /**
@@ -197,7 +151,7 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
             'Handler does not implement Countable'
         );
 
-        $this->assertType(
+        $this->assertInternalType(
             'int',
             count($this->handler),
             'count() must return an integer'
@@ -384,6 +338,10 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
     public function testAddPluginByInstanceReturnsPluginInstance()
     {
         $plugin = $this->getMockPlugin();
+        $this->ui
+        	->expects($this->once())
+        	->method('onPluginLoad')
+        	;
         $returnedPlugin = $this->handler->addPlugin($plugin);
         $this->assertSame(
             $returnedPlugin,
@@ -402,10 +360,14 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
         $pluginName = 'Mock';
         $this->handler->addPath(dirname(__FILE__), 'Phergie_Plugin_');
 
+        $this->ui
+        	->expects($this->once())
+        	->method('onPluginLoad')
+        	;
         $returnedPlugin = $this->handler->addPlugin($pluginName);
         $this->assertTrue($this->handler->hasPlugin($pluginName));
 
-        $this->assertType(
+        $this->assertInstanceOf(
             'Phergie_Plugin_Mock',
             $this->handler->getPlugin($pluginName)
         );
@@ -426,6 +388,10 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
     public function testAddPluginByInstance()
     {
         $plugin = $this->getMockPlugin();
+        $this->ui
+        	->expects($this->once())
+        	->method('onPluginLoad')
+        	;
         $returnedPlugin = $this->handler->addPlugin($plugin);
         $this->assertTrue($this->handler->hasPlugin('TestPlugin'));
 
@@ -450,6 +416,10 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
      */
     public function testAddPluginThrowsExceptionWhenPluginFileNotFound()
     {
+        $this->ui
+        	->expects($this->once())
+        	->method('onPluginFailure')
+        	;
         try {
             $this->handler->addPlugin('TestPlugin');
         } catch(Phergie_Plugin_Exception $e) {
@@ -504,6 +474,10 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
         touch($path . '/TestPlugin.php');
         $this->handler->addPath($path, 'Phergie_Plugin_');
 
+        $this->ui
+        	->expects($this->once())
+        	->method('onPluginFailure')
+        	;
         try {
             $this->handler->addPlugin('TestPlugin');
         } catch(Phergie_Plugin_Exception $e) {
@@ -530,6 +504,10 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
      */
     public function testAddPluginThrowsExceptionIfRequestingNonPlugin()
     {
+        $this->ui
+        	->expects($this->once())
+        	->method('onPluginFailure')
+        	;
         try {
             $this->handler->addPlugin('Handler');
         } catch(Phergie_Plugin_Exception $e) {
@@ -551,6 +529,10 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
      */
     public function testAddPluginThrowsExceptionIfPluginNotInstantiable()
     {
+        $this->ui
+        	->expects($this->once())
+        	->method('onPluginFailure')
+        	;
         $this->handler->addPath(dirname(__FILE__), 'Phergie_Plugin_');
         try {
             $this->handler->addPlugin('TestNonInstantiablePluginFromFile');
@@ -576,6 +558,10 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
         $pluginName = 'Mock';
         $this->handler->addPath(dirname(__FILE__), 'Phergie_Plugin_');
 
+        $this->ui
+        	->expects($this->once())
+        	->method('onPluginLoad')
+        	;
         $arguments = array('a', 'b', 'c');
         $plugin = $this->handler->addPlugin($pluginName, $arguments);
 
@@ -596,6 +582,10 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
     {
         $pluginName = 'Mock';
         $this->handler->addPath(dirname(__FILE__), 'Phergie_Plugin_');
+        $this->ui
+        	->expects($this->once())
+        	->method('onPluginLoad')
+        	;
         $plugin = $this->handler->addPlugin($pluginName);
 
         $this->assertSame(
@@ -622,6 +612,10 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
         $plugin
             ->expects($this->once())
             ->method('onLoad');
+        $this->ui
+        	->expects($this->once())
+        	->method('onPluginLoad')
+        	;
         $this->handler->addPlugin($plugin);
     }
 
@@ -634,6 +628,10 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
     {
         $pluginName = 'Mock';
         $this->handler->addPath(dirname(__FILE__), 'Phergie_Plugin_');
+        $this->ui
+        	->expects($this->once())
+        	->method('onPluginLoad')
+        	;
         $plugin1 = $this->handler->addPlugin($pluginName);
         $plugin2 = $this->handler->addPlugin($pluginName);
         $this->assertSame($plugin1, $plugin2);
@@ -681,6 +679,10 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
             ->expects($this->once())
             ->method('onLoad')
             ->will($this->throwException(new Phergie_Plugin_Exception));
+        $this->ui
+        	->expects($this->once())
+        	->method('onPluginFailure')
+        	;
         try {
             $this->handler->addPlugin($plugin);
             $this->fail('Expected exception not thrown');
@@ -705,6 +707,10 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
         $this->handler->addPath(dirname(__FILE__), $prefix);
 
         $plugin = 'Mock';
+        $this->ui
+        	->expects($this->once())
+        	->method('onPluginLoad')
+        	;
         $this->handler->addPlugins(array($plugin));
         $returnedPlugin = $this->handler->getPlugin($plugin);
         $this->assertContains(
@@ -729,6 +735,10 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
 
         $arguments = array(1, 2, 3);
         $plugin = array('Mock', $arguments);
+        $this->ui
+        	->expects($this->once())
+        	->method('onPluginLoad')
+        	;
         $this->handler->addPlugins(array($plugin));
         $returnedPlugin = $this->handler->getPlugin('Mock');
         $this->assertEquals(
@@ -776,7 +786,7 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
 
     /**
      * Tests getPlugin() when the plugin is not already loaded and
-     * autoloading is disabled.
+     * autoloading is enabled.
      *
      * @depends testSetAutoload
      * @return void
@@ -785,8 +795,12 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
     {
         $this->handler->setAutoload(true);
         $this->handler->addPath(dirname(__FILE__), 'Phergie_Plugin_');
+        $this->ui
+        	->expects($this->once())
+        	->method('onPluginLoad')
+        	;
         $plugin = $this->handler->getPlugin('Mock');
-        $this->assertType(
+        $this->assertInstanceOf(
             'Phergie_Plugin_Mock',
             $plugin,
             'Retrieved plugin not of expected class'
@@ -801,6 +815,11 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
      */
     public function testGetPlugins()
     {
+        $this->ui
+        	->expects($this->exactly(2))
+        	->method('onPluginLoad')
+        	;
+
         $plugin1 = $this->getMockPlugin('TestPlugin1');
         $this->handler->addPlugin($plugin1);
 
@@ -826,6 +845,11 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
      */
     public function testUseMultiplePluginIteratorsConcurrently()
     {
+        $this->ui
+        	->expects($this->exactly(2))
+        	->method('onPluginLoad')
+        	;
+
         $plugin1 = $this->getMockPlugin('TestPlugin1');
         $this->handler->addPlugin($plugin1);
 
@@ -838,6 +862,14 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
 
         $iterator2 = $this->handler->getIterator();
         $this->assertSame($plugin1, $iterator2->current());
+        $this->assertSame($plugin2, $iterator1->current());
+
+        $iterator3 = $this->handler->getIterator();
+        $this->assertSame($plugin1, $iterator3->current());
+
+        $iterator2->next();
+        $this->assertSame($plugin2, $iterator2->current());
+        $this->assertSame($plugin1, $iterator3->current());
     }
 
     /**
@@ -858,12 +890,17 @@ class Phergie_Plugin_HandlerTest extends PHPUnit_Framework_TestCase
             ->expects($this->any())
             ->method('offsetGet')
             ->will($this->returnValue($paths));
+        $this->ui
+        	->expects($this->once())
+        	->method('onPluginLoad')
+        	;
 
         // Reinitialize the handler so the configuration change takes effect
         // within the constructor
         $this->handler = new Phergie_Plugin_Handler(
             $this->config,
-            $this->events
+            $this->events,
+            $this->ui
         );
 
         $this->handler->setAutoload(true);

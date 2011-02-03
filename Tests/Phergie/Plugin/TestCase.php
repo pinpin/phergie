@@ -108,6 +108,13 @@ abstract class Phergie_Plugin_TestCase extends Phergie_TestCase
      */
     protected function assertEmitsEvent($type, array $args = array())
     {
+        // this is to skip the test that the plugin is active in the current connection
+        $this->plugins
+            ->expects($this->any())
+            ->method('isPluginInConnection')
+            ->with($this->equalTo($this->plugin->getName()), $this->anything())
+            ->will($this->returnValue(TRUE));
+        // and this is the event being generated
         $this->events
             ->expects($this->at(0))
             ->method('addEvent')

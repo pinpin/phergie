@@ -172,7 +172,8 @@ class Phergie_Bot
         if (empty($this->plugins)) {
             $this->plugins = new Phergie_Plugin_Handler(
                 $this->getConfig(),
-                $this->getEventHandler()
+                $this->getEventHandler(),
+                $this->getUi()
             );
         }
         return $this->plugins;
@@ -309,6 +310,27 @@ class Phergie_Bot
         return $this;
     }
 
+	/**
+	 * Adds the specified plugins (for the specified connection) or just adds an "assignement" to the connection if already loaded
+	 *
+	 * @param Phergie_Plugin_Handler $plugins			plugin handler
+	 * @param array                  $names				names of plugins to load
+	 * @param string                 $connection		connection's uniqid this plugin should be added for
+	 * @param bool                   $inc_all			whether or not to also include the "global" plugins for this connection
+	 *
+	 * @return void
+	 */
+	private function _loadPlugins($plugins, $names, $connection = NULL, $inc_all = NULL)
+	{
+		foreach ($names as $name) {
+			if (!isset($plugins->$name)) {
+                $plugin = $plugins->addPlugin($name, NULL, $connection, $inc_all);
+            } else {
+            	$plugins->addPluginConnection(strtolower($name), $connection, $inc_all);
+            }
+		}
+	}
+
     /**
      * Loads plugins into the plugin handler.
      *
@@ -317,11 +339,6 @@ class Phergie_Bot
     protected function loadPlugins()
     {
         $config = $this->getConfig();
-        if (!isset($config['plugins'])
-            || !is_array($config['plugins'])
-        ) {
-            return;
-        }
 
         if (isset($config['plugins.autoload'])) {
             $autoload = (bool) $config['plugins.autoload'];
@@ -333,13 +350,23 @@ class Phergie_Bot
         $plugins = $this->getPluginHandler();
         $plugins->setAutoload($autoload);
 
-        foreach ($config['plugins'] as $name) {
-            try {
-                $plugin = $plugins->addPlugin($name);
-                $ui->onPluginLoad($name);
-            } catch (Phergie_Plugin_Exception $e) {
-                $ui->onPluginFailure($name, $e->getMessage());
-            }
+        if (isset($config['plugins'])
+            && is_array($config['plugins'])
+        ) {
+			$this->_loadPlugins($plugins, $config['plugins']);
+        }
+
+        // per-connection plugins
+        if (isset($config['connections'])
+            && is_array($config['connections'])
+        ) {
+	        foreach ($config['connections'] as $data) {
+	        	if (isset($data['plugins'])) {
+	        		$this->_loadPlugins($plugins, $data['plugins'], $data['uniqid']);
+	        	} else if (isset($data['plugins_extra'])) {
+	        		$this->_loadPlugins($plugins, $data['plugins_extra'], $data['uniqid'], TRUE);
+	        	}
+	        }
         }
     }
 
