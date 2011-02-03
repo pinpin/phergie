@@ -62,7 +62,14 @@ class Phergie_Connection
     protected $encoding;
 
     /**
-     * Nick that the client will use
+     * Nick that the client should use (i.e. from config)
+     *
+     * @var string
+     */
+    protected $nick_config;
+
+    /**
+     * Nick that the client uses
      *
      * @var string
      */
@@ -95,6 +102,13 @@ class Phergie_Connection
      * @var Phergie_Hostmask
      */
     protected $hostmask;
+
+	/**
+	 * Uniqid for this connection -- to id it uniquely during runtime
+	 *
+	 * @var string
+	 */
+	protected $uniqid;
 
     /**
      * Constructor to initialize instance properties.
@@ -276,6 +290,32 @@ class Phergie_Connection
     }
 
     /**
+     * Sets the nick that the client should use.
+     *
+     * @param string $nick Nickname
+     *
+     * @return Phergie_Connection Provides a fluent interface
+     */
+    public function setNickConfig($nick)
+    {
+        if (empty($this->nick_config)) {
+        	$this->nick_config = (string) $nick;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Returns the nick that the client should use.
+     *
+     * @return string
+     */
+    public function getNickConfig()
+    {
+        return $this->nick_config;
+    }
+
+    /**
      * Sets the nick that the client will use.
      *
      * @param string $nick Nickname
@@ -284,9 +324,8 @@ class Phergie_Connection
      */
     public function setNick($nick)
     {
-        if (empty($this->nick)) {
-            $this->nick = (string) $nick;
-        }
+        $this->nick = (string) $nick;
+		$this->hostmask = '';
 
         return $this;
     }
@@ -302,6 +341,33 @@ class Phergie_Connection
 
         return $this->nick;
     }
+
+	/**
+	 * Sets the uniqid for this connection -- can only be set once, will be done by Phergie_Config upon reading config
+	 *
+	 * @param string $uniqid			uniqid for this connection
+	 *
+	 * @return Phergie_Connection		Provides a fluent interface
+	 */
+	public function setUniqid($uniqid)
+	{
+		if (empty($this->uniqid))
+		{
+			$this->uniqid = (string) $uniqid;
+		}
+		return $this;
+	}
+
+	/**
+	 * Returns the uniqid for this connection
+	 *
+	 * @return string
+	 */
+	public function getUniqid()
+	{
+		$this->checkSetting('uniqid');
+		return $this->uniqid;
+	}
 
     /**
      * Sets the username that the client will use.
@@ -400,6 +466,9 @@ class Phergie_Connection
             if (method_exists($this, $method)) {
                 $this->$method($value);
             }
+        }
+        if (isset($options['nick'])) {
+        	$this->setNickConfig($options['nick']);
         }
     }
 }

@@ -162,7 +162,9 @@ class Phergie_ConfigTest extends PHPUnit_Framework_TestCase
      */
     public function testReadThrowsExceptionForUnreadableFile()
     {
-        $file = $this->createTempFile();
+        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+        	$this->markTestSkipped('chmod() call to make file unreadable useless on windows');
+        }        $file = $this->createTempFile();
         if (!chmod($file, 0000)) {
             $this->markTestSkipped('chmod() call to make file unreadable failed');
         }
@@ -244,7 +246,33 @@ class Phergie_ConfigTest extends PHPUnit_Framework_TestCase
         );
 
         $this->assertEquals('bar', $this->config['foo']);
+        $this->assertEquals('bar', $this->config->getSetting('foo'));
     }
+
+	/**
+	 * Tests that when reading file, readFile actually calls readArray to
+	 * handle things.
+	 * This makes sure everything is always does the same, and allows us to
+	 * only test readArray from now on (per-connection stuff...), and know
+	 * readFile will behave the same.
+	 *
+	 * @return void
+	 * @depends testReadWithValidFile
+	 */
+	public function testReadFileUsesReadArray()
+	{
+		$config = $this->getMock('Phergie_Config', array('readArray'));
+		$config
+			->expects($this->once())
+			->method('readArray')
+			->with($this->equalTo(array('foo' => 'bar')))
+			;
+
+        $file = $this->createTempFile();
+        file_put_contents($file, '<?php return array("foo" => "bar");');
+
+        $config->read($file);
+	}
 
     /**
      * Tests that the configuration object is able to read an associative
@@ -262,7 +290,167 @@ class Phergie_ConfigTest extends PHPUnit_Framework_TestCase
             $returned,
             'readArray() does not implement a fluent interface'
         );
-        $this->assertEquals($this->config['foo'], 'bar');
+        $this->assertEquals('bar', $this->config['foo']);
+        $this->assertEquals('bar', $this->config->getSetting('foo'));
+    }
+
+	/**
+	 * Tests that upon reading connections, uniqids are generated (overwriting
+	 * any value set in config if any, since there shouldn't be)
+	 *
+	 * @return void
+     * @depends testImplementsOffsetGet
+	 * @depends testReadArray
+	 */
+	public function testReadingConnectionsSetsUniqids()
+	{
+		$this->config->readArray(array('connections' => array(
+        	array('host' => 'host1',
+	        ),
+        	array('host' => 'host2',
+        		'uniqid' => 'uniqid42',
+	        ),
+        	array('host' => 'host3',
+	        ),
+	    )));
+
+	    $i = 0;
+	    $this->assertEquals(3, count($this->config['connections']));
+	    foreach ($this->config['connections'] as $connection) {
+	    	$this->assertEquals('host' . ++$i, $connection['host']);
+	    	$this->assertArrayHasKey('uniqid', $connection);
+	    	if ($i == 2) {
+	    		$this->assertNotEquals('uniqid42', $connection['uniqid']);
+	    	}
+	    }
+	}
+
+	/**
+	 * Reads a config with connection-specific values and returns the list of connections' uniqids
+	 *
+	 * @return array
+	 */
+	protected function readConnectionSpecificConfig()
+	{
+        // setup a setting with 2 connections and their specific values
+        $this->config->readArray(array('foo' => 'bar', 'connections' => array(
+        	array('config' => array(
+	        	'foo' => 'foo1',
+	        )),
+        	array('config' => array(
+	        	'foo' => 'foo2',
+	        )),
+	        array(),
+        )));
+
+        // grab the connections' uniqids generated
+        $uniqids = array();
+        foreach ($this->config['connections'] as $connection) {
+        	$uniqids[] = $connection['uniqid'];
+        }
+
+		return $uniqids;
+	}
+
+    /**
+     * Tests that with connection-specific settings getting global values
+     * still works
+     *
+     * @return void
+     * @depends testImplementsOffsetGet
+     * @depends testReadArray
+     * @depends testReadingConnectionsSetsUniqids
+     */
+    public function testGlobalWithConnectionSpecificConfig()
+    {
+    	$uniqids = $this->readConnectionSpecificConfig();
+        
+        $this->assertEquals('bar', $this->config['foo']);
+        $this->assertEquals('bar', $this->config->getSetting('foo'));
+    }
+
+    /**
+     * Tests getting connection-specific settings
+     *
+     * @return void
+     * @depends testImplementsOffsetGet
+     * @depends testReadArray
+     * @depends testReadingConnectionsSetsUniqids
+     */
+    public function testConnectionSpecificConfig()
+    {
+    	$uniqids = $this->readConnectionSpecificConfig();
+        
+        $connection = $this->getMock('Phergie_Connection');
+        $connection
+        	->expects($this->once())
+        	->method('getUniqid')
+        	->will($this->returnValue($uniqids[0]))
+        	;
+        $this->assertEquals('foo1', $this->config->getSetting('foo', $connection));
+
+        $connection = $this->getMock('Phergie_Connection');
+        $connection
+        	->expects($this->once())
+        	->method('getUniqid')
+        	->will($this->returnValue($uniqids[1]))
+        	;
+        $this->assertEquals('foo2', $this->config->getSetting('foo', $connection));
+
+        $connection = $this->getMock('Phergie_Connection');
+        $connection
+        	->expects($this->once())
+        	->method('getUniqid')
+        	->will($this->returnValue($uniqids[2]))
+        	;
+        $this->assertEquals('bar', $this->config->getSetting('foo', $connection));
+    }
+
+    /**
+     * Tests getting global setting after getting the same connection-specific setting
+     *
+     * @return void
+     * @depends testImplementsOffsetGet
+     * @depends testReadArray
+     * @depends testReadingConnectionsSetsUniqids
+     * @depends testConnectionSpecificConfig
+     */
+    public function testGlobalAfterCallingConnectionSpecificConfig()
+    {
+    	$uniqids = $this->readConnectionSpecificConfig();
+        
+        $connection = $this->getMock('Phergie_Connection');
+        $connection
+        	->expects($this->once())
+        	->method('getUniqid')
+        	->will($this->returnValue($uniqids[0]))
+        	;
+        $this->assertEquals('foo1', $this->config->getSetting('foo', $connection));
+
+        $this->assertEquals('bar', $this->config->getSetting('foo'));
+    }
+
+    /**
+     * Tests getting connection-specific settings for unknown connection gets
+     * the global setting
+     *
+     * @return void
+     * @depends testImplementsOffsetGet
+     * @depends testReadArray
+     * @depends testReadingConnectionsSetsUniqids
+     * @depends testConnectionSpecificConfig
+     */
+    public function testConnectionSpecificConfigUnknownConnectionSendsGlobal()
+    {
+    	$uniqids = $this->readConnectionSpecificConfig();
+        
+        $connection = $this->getMock('Phergie_Connection');
+        $connection
+        	->expects($this->once())
+        	->method('getUniqid')
+        	->will($this->returnValue('unknown'))
+        	;
+        $this->assertEquals('bar', $this->config->getSetting('foo', $connection));
     }
 
     /**

@@ -126,7 +126,7 @@ abstract class Phergie_TestCase extends PHPUnit_Framework_TestCase
     {
         if (empty($this->config)) {
             $this->config = $this->getMock(
-                'Phergie_Config', array('offsetExists', 'offsetGet')
+                'Phergie_Config', array('offsetExists', 'offsetGet', 'getSetting')
             );
             $this->config
                 ->expects($this->any())
@@ -135,6 +135,10 @@ abstract class Phergie_TestCase extends PHPUnit_Framework_TestCase
             $this->config
                 ->expects($this->any())
                 ->method('offsetGet')
+                ->will($this->returnCallback(array($this, 'configOffsetGet')));
+            $this->config
+                ->expects($this->any())
+                ->method('getSetting')
                 ->will($this->returnCallback(array($this, 'configOffsetGet')));
         }
         return $this->config;
@@ -164,7 +168,10 @@ abstract class Phergie_TestCase extends PHPUnit_Framework_TestCase
      */
     public function configOffsetGet($name)
     {
-        return $this->settings[$name];
+        if (isset($this->settings[$name])) {
+        	return $this->settings[$name];
+        }
+        return null;
     }
 
     /**

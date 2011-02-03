@@ -106,28 +106,34 @@ class Phergie_Connection_HandlerTest extends Phergie_TestCase
     }
 
     /**
-     * Tests removing a connection by specifying the connection hostmask
+     * Tests removing a connection by specifying the connection uniqid
      * when the connection is present.
      *
      * @return void
      * @depends testAddConnection
      */
-    public function testRemoveConnectionByHostmaskWithConnectionPresent()
+    public function testRemoveConnectionByUniqidWithConnectionPresent()
     {
+        $uniqid = uniqid('', TRUE);
         $connection = $this->getMockConnection();
+        $connection
+            ->expects($this->any())
+            ->method('getUniqid')
+            ->will($this->returnValue($uniqid));
+
         $this->connections->addConnection($connection);
-        $this->connections->removeConnection((string) $connection->getHostmask());
+        $this->connections->removeConnection($connection->getUniqid());
         $this->assertEquals(0, count($this->connections));
     }
 
     /**
      * Tests that removing a connection by specifying the connection
-     * hostmask when the connection is not present.
+     * uniqid when the connection is not present.
      *
      * @return void
      * @depends testAddConnection
      */
-    public function testRemoveConnectionByHostmaskWithConnectionAbsent()
+    public function testRemoveConnectionByUniqidWithConnectionAbsent()
     {
         $this->connections->removeConnection('foo');
     }
@@ -143,77 +149,52 @@ class Phergie_Connection_HandlerTest extends Phergie_TestCase
     }
 
     /**
-     * Returns a mock hostmask instance.
-     *
-     * @param string $nick     User's nickname
-     * @param string $username User's username
-     * @param string $host     User's hostname
-     *
-     * @return Phergie_Hostmask
-     */
-    protected function getMockHostmask($nick, $username, $host)
-    {
-        $hostmask = $this->getMock(
-            'Phergie_Hostmask', array('__toString'), array($nick, $username, $host)
-        );
-        $hostmask
-            ->expects($this->any())
-            ->method('__toString')
-            ->will($this->returnValue($nick . '!' . $username . '@' . $host));
-        return $hostmask;
-    }
-
-    /**
-     * Tests retrieving a single connection by its hostmask.
+     * Tests retrieving a single connection by its uniqid.
      *
      * @return void
      */
     public function testGetConnectionsWithSingleConnection()
     {
-        $hostmask = $this->getMockHostmask('nick', 'username', 'host');
-        $hostmaskString = (string) $hostmask;
+        $uniqid = uniqid('', TRUE);
 
         $connection = $this->getMockConnection();
         $connection
             ->expects($this->any())
-            ->method('getHostmask')
-            ->will($this->returnValue($hostmask));
+            ->method('getUniqid')
+            ->will($this->returnValue($uniqid));
 
         $this->connections->addConnection($connection);
-        $connections = $this->connections->getConnections($hostmaskString);
-        $this->assertType('array', $connections);
+        $connections = $this->connections->getConnections($uniqid);
+        $this->assertInternalType('array', $connections);
         $this->assertSame(1, count($connections));
-        $this->assertArrayHasKey($hostmaskString, $connections);
-        $this->assertSame($connection, $connections[$hostmaskString]);
+        $this->assertArrayHasKey($uniqid, $connections);
+        $this->assertSame($connection, $connections[$uniqid]);
     }
 
     /**
-     * Tests retrieving multiple connections by their hostmasks.
+     * Tests retrieving multiple connections by their uniqids.
      *
      * @return void
      */
     public function testGetConnectionsWithMultipleConnections()
     {
-        $hostmasks = $hostmaskStrings = $connections = array();
+        $uniqids = $connections = array();
         $connection = $this->getMockConnection();
         foreach (range(1, 2) as $index) {
-            $hostmasks[$index] = $this->getMockHostmask(
-                'nick' . $index, 'username' . $index, 'host' . $index
-            );
-            $hostmaskStrings[$index] = (string) $hostmasks[$index];
+            $uniqids[$index] = uniqid('', TRUE);
             $connections[$index] = clone $connection;
             $connections[$index]
                 ->expects($this->any())
-                ->method('getHostmask')
-                ->will($this->returnValue($hostmasks[$index]));
+                ->method('getUniqid')
+                ->will($this->returnValue($uniqids[$index]));
             $this->connections->addConnection($connections[$index]);
         }
-        $returned = $this->connections->getConnections($hostmaskStrings);
-        $this->assertType('array', $returned);
+        $returned = $this->connections->getConnections($uniqids);
+        $this->assertInternalType('array', $returned);
         $this->assertEquals(2, count($returned));
-        foreach ($hostmaskStrings as $index => $hostmaskString) {
-            $this->assertArrayHasKey($hostmaskString, $returned);
-            $this->assertSame($connections[$index], $returned[$hostmaskString]);
+        foreach ($uniqids as $index => $uniqid) {
+            $this->assertArrayHasKey($uniqid, $returned);
+            $this->assertSame($connections[$index], $returned[$uniqid]);
         }
     }
 }

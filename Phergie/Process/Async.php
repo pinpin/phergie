@@ -97,11 +97,11 @@ class Phergie_Process_Async extends Phergie_Process_Abstract
      */
     public function handleEvents()
     {
-        $hostmasks = $this->driver->getActiveReadSockets($this->sec, $this->usec);
-        if (!$hostmasks) {
+        $uniqids = $this->driver->getActiveReadSockets($this->sec, $this->usec);
+        if (!$uniqids) {
             return;
         }
-        $connections = $this->connections->getConnections($hostmasks);
+        $connections = $this->connections->getConnections($uniqids);
         foreach ($connections as $connection) {
             $this->driver->setConnection($connection);
             $this->plugins->setConnection($connection);

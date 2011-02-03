@@ -31,7 +31,7 @@
 class Phergie_Connection_Handler implements Countable, IteratorAggregate
 {
     /**
-     * Map of connections indexed by hostmask
+     * Map of connections indexed by uniqid
      *
      * @var array
      */
@@ -56,14 +56,14 @@ class Phergie_Connection_Handler implements Countable, IteratorAggregate
      */
     public function addConnection(Phergie_Connection $connection)
     {
-        $this->connections[(string) $connection->getHostmask()] = $connection;
+        $this->connections[$connection->getUniqid()] = $connection;
         return $this;
     }
 
     /**
      * Removes a connection from the connection list.
      *
-     * @param Phergie_Connection|string $connection Instance or hostmask for
+     * @param Phergie_Connection|string $connection Instance or uniqid for
      *        the connection to remove
      *
      * @return Phergie_Connection_Handler Provides a fluent interface
@@ -71,14 +71,14 @@ class Phergie_Connection_Handler implements Countable, IteratorAggregate
     public function removeConnection($connection)
     {
         if ($connection instanceof Phergie_Connection) {
-            $hostmask = (string) $connection->getHostmask();
+            $uniqid = $connection->getUniqid();
         } elseif (is_string($connection)
             && isset($this->connections[$connection])) {
-            $hostmask = $connection;
+            $uniqid = $connection;
         } else {
             return $this;
         }
-        unset($this->connections[$hostmask]);
+        unset($this->connections[$uniqid]);
         return $this;
     }
 
@@ -105,11 +105,11 @@ class Phergie_Connection_Handler implements Countable, IteratorAggregate
     /**
      * Returns a list of specified connection objects.
      *
-     * @param array|string $keys One or more hostmasks identifying the
+     * @param array|string $keys One or more uniqids identifying the
      *        connections to return (optional)
      *
      * @return array List of Phergie_Connection objects corresponding to the
-     *         specified hostmask(s)
+     *         specified uniqid(s)
      */
     public function getConnections($keys = null)
     {

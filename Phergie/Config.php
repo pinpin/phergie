@@ -47,6 +47,13 @@ class Phergie_Config implements ArrayAccess
     protected $settings = array();
 
     /**
+     * Mapping of connection-specific setting names to their current corresponding values
+     *
+     * @var array
+     */
+    protected $_connection_settings = array();
+
+    /**
      * Includes a specified PHP configuration file and incorporates its
      * return value (which should be an associative array) into the current
      * configuration settings.
@@ -81,7 +88,8 @@ class Phergie_Config implements ArrayAccess
         }
 
         $this->files[$file] = array_keys($settings);
-        $this->settings += $settings;
+        // we use $this->readArray() so that all the connection-specific stuff & whatnot are done automatically
+        $this->readArray($settings);
 
         return $this;
     }
@@ -97,10 +105,56 @@ class Phergie_Config implements ArrayAccess
      */
     public function readArray(array $settings)
     {
+        // sync connection stuff if needed
+        if (isset($settings['connections']))
+        {
+        	foreach ($settings['connections'] as $k => $connection)
+        	{
+        		// set up connection uniqid
+        		$uniqid = uniqid('', TRUE);
+        		$settings['connections'][$k]['uniqid'] = $uniqid;
+        		// connection-specific settings
+        		if (isset($connection['config']))
+        		{
+        			if (is_array($connection['config']))
+        			{
+        				$this->_connection_settings[$uniqid] = $connection['config'];
+        			}
+        			unset($settings['connections'][$k]['config']);
+        		}
+        	}
+        }
+
         $this->settings += $settings;
 
         return $this;
     }
+
+	/**
+	 * Returns the value of a configuration setting
+	 *
+	 * @param string             $name			Configuration setting name
+	 * @param Phergie_Connection $connection	Name of the host to get connection-specific settings if available
+	 *
+	 * @return mixed							Configuration setting value or NULL if it is not assigned a value
+	 */
+	public function getSetting($name, Phergie_Connection $connection = NULL)
+	{
+		if (isset($connection) && isset($this->_connection_settings[$uniqid = $connection->getUniqid()]) && isset($this->_connection_settings[$uniqid][$name]))
+		{
+			$value = $this->_connection_settings[$uniqid][$name];
+		}
+		else if (isset($this->settings[$name]))
+		{
+			$value = $this->settings[$name];
+		}
+		else
+		{
+			$value = NULL;
+		}
+		
+		return $value;
+	}
 
     /**
      * Writes the values of the current configuration settings back to their

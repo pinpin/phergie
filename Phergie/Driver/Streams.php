@@ -141,9 +141,9 @@ class Phergie_Driver_Streams extends Phergie_Driver_Abstract
     public function setConnection(Phergie_Connection $connection)
     {
         // Set the active socket handler
-        $hostmask = (string) $connection->getHostmask();
-        if (!empty($this->sockets[$hostmask])) {
-            $this->socket = $this->sockets[$hostmask];
+        $uniqid = $connection->getUniqid();
+        if (!empty($this->sockets[$uniqid])) {
+            $this->socket = $this->sockets[$uniqid];
         }
 
         // Set the active connection
@@ -151,18 +151,18 @@ class Phergie_Driver_Streams extends Phergie_Driver_Abstract
     }
 
     /**
-     * Returns a list of hostmasks corresponding to sockets with data to read.
+     * Returns a list of uniqids corresponding to sockets with data to read.
      *
      * @param int $sec  Length of time to wait for new data (seconds)
      * @param int $usec Length of time to wait for new data (microseconds)
      *
-     * @return array List of hostmasks or an empty array if none were found
+     * @return array List of uniqids or an empty array if none were found
      *         to have data to read
      */
     public function getActiveReadSockets($sec = 0, $usec = 200000)
     {
         $read = $this->sockets;
-        $write = $except = $sec = $usec = null;
+        $write = $except = null;
         $active = array();
 
         if (count($this->sockets) > 0) {
@@ -399,7 +399,7 @@ class Phergie_Driver_Streams extends Phergie_Driver_Abstract
         $this->send('NICK', $nick);
 
         // Add the socket handler to the internal array for socket handlers
-        $this->sockets[(string) $connection->getHostmask()] = $this->socket;
+        $this->sockets[$connection->getUniqid()] = $this->socket;
     }
 
     /**
